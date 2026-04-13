@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cmd /c \"dir C:\\\\Users\\\\vrock\\\\OneDrive\\\\Documents\\\\Roborock\")",
+      "Bash(npm install:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm run:*)",
+      "Bash(code --open-url \"http://localhost:3000\")",
+      "Bash(code --command \"simpleBrowser.show\")"
+    ]
+  }
+}
