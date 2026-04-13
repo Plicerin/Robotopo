@@ -53,7 +53,7 @@ export default function App() {
 
       {/* ── Title ──────────────────────────────────────────────────────────── */}
       <h1 style={{ margin: 0, fontSize: '26px', fontWeight: 900, letterSpacing: '5px', color: '#42A5F5', textShadow: '0 0 20px #42A5F566' }}>
-        ROBOROCK
+        ROBOTOPO
       </h1>
 
       {/* ── Score bar ──────────────────────────────────────────────────────── */}
