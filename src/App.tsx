@@ -136,7 +136,7 @@ export default function App() {
       {/* ── Board + Workbench ─────────────────────────────────────────────── */}
       <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', width: '100%' }}>
         <GameCanvas game={game} state={state} />
-        <div style={{ position: 'absolute', right: `-${144 + GAP}px`, top: 1, display: 'flex', flexDirection: 'column', gap: '18px' }}>
+        <div style={{ position: 'absolute', right: `-${144 + GAP}px`, top: 2, display: 'flex', flexDirection: 'column', gap: '18px' }}>
           <RobotPanel tray={state.tray} phase={state.phase} />
         </div>
       </div>
