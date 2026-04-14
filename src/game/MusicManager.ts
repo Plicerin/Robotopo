@@ -6,17 +6,41 @@ export class MusicManager {
   constructor(src: string) {
     if (typeof window === 'undefined') return;
 
-    this.audio = new Audio(src);
-    this.audio.loop = true;
-    this.audio.volume = this.volume;
+    try {
+      this.audio = new Audio(src);
+      this.audio.loop = true;
+      this.audio.volume = this.volume;
+      console.log('MusicManager: Audio element created for:', src);
+
+      this.audio.addEventListener('canplay', () => {
+        console.log('MusicManager: Audio loaded and ready to play');
+      });
+
+      this.audio.addEventListener('error', (e) => {
+        console.error('MusicManager: Error loading audio:', e);
+      });
+    } catch (e) {
+      console.error('MusicManager: Failed to create audio element:', e);
+    }
   }
 
   play(): void {
-    if (!this.audio || this.muted) return;
+    if (!this.audio) {
+      console.warn('MusicManager: No audio element available');
+      return;
+    }
+    if (this.muted) {
+      console.log('MusicManager: Audio is muted, not playing');
+      return;
+    }
     if (this.audio.paused) {
-      this.audio.play().catch(() => {
-        console.warn('Failed to play background music');
-      });
+      console.log('MusicManager: Playing audio...');
+      const playPromise = this.audio.play();
+      if (playPromise !== undefined) {
+        playPromise.catch((error) => {
+          console.error('MusicManager: Playback failed:', error);
+        });
+      }
     }
   }
 

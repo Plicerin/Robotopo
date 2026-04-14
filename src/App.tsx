@@ -35,10 +35,22 @@ export default function App() {
     return () => window.removeEventListener('beforeunload', onUnload);
   }, []);
 
-  // Background music
+  // Background music - start on first user interaction (browsers block autoplay)
   useEffect(() => {
-    music.play();
-    return () => music.pause();
+    const playMusicOnInteraction = () => {
+      console.log('App: User interaction detected, starting music');
+      music.play();
+      document.removeEventListener('click', playMusicOnInteraction);
+      document.removeEventListener('keydown', playMusicOnInteraction);
+    };
+
+    document.addEventListener('click', playMusicOnInteraction);
+    document.addEventListener('keydown', playMusicOnInteraction);
+
+    return () => {
+      document.removeEventListener('click', playMusicOnInteraction);
+      document.removeEventListener('keydown', playMusicOnInteraction);
+    };
   }, []);
 
   function startGame(cpuEnabled: boolean) {
