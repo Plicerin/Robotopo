@@ -88,22 +88,18 @@ export function RobotPanel({ tray, phase }: Props) {
               display:        'flex',
               alignItems:     'center',
               justifyContent: 'center',
-              border:         done ? `3px solid ${hex}` : '3px solid #4488cc',
-              borderRadius:   '8px',
-              background:     done ? `${hex}22` : '#1e3a5f33',
-              boxShadow:      done ? `0 0 8px ${hex}66` : 'inset 0 0 8px #4488cc22',
             }}>
               <img
                 src={`/assets/${color || 'blue'}_${partName}.png`}
                 alt={partName}
                 style={{
-                  width:      '48px',
-                  height:     '48px',
+                  width:      '56px',
+                  height:     '56px',
                   objectFit:  'contain',
-                  opacity:    done ? 1 : 0.2,
+                  opacity:    done ? 1 : 0.6,
                   filter:     done
-                    ? `drop-shadow(0 0 6px ${hex})`
-                    : `brightness(0.4) saturate(0)`,
+                    ? `drop-shadow(0 0 2px ${hex}) drop-shadow(0 0 4px ${hex}) drop-shadow(0 0 6px ${hex})`
+                    : `grayscale(100%) drop-shadow(0 0 2px #4488cc) drop-shadow(0 0 4px #4488cc) brightness(0.9)`,
                   transition: 'opacity 0.3s, filter 0.3s',
                   pointerEvents: 'none',
                 }}
