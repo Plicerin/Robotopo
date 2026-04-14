@@ -39,14 +39,15 @@ export function RobotPanel({ tray, phase }: Props) {
   return (
     <div style={{
       width:        '144px',
-      background:   '#060d18',
-      border:       `1px solid ${themeColor}55`,
+      background:   'rgba(6, 13, 24, 0.8)',
+      border:       `2px solid ${themeColor}cc`,
       borderRadius: '12px',
       padding:      '10px 8px',
       display:      'flex',
       flexDirection:'column',
       gap:          '8px',
       alignItems:   'center',
+      boxShadow:    `0 0 20px ${themeColor}44`,
     }}>
       {/* Header */}
       <div style={{ textAlign: 'center', fontSize: '9px', fontWeight: 800, letterSpacing: '2px', color: themeColor }}>
