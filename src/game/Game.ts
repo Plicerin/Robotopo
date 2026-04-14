@@ -10,6 +10,7 @@ import { SCORE_PER_PIECE, ROBOT_BONUS, LEVEL_TARGETS, COLOR_NAMES, COLOR_ATTACK 
 import { findBestMove } from './AI';
 import { commitGame, loadLogs, saveLogs } from './Records';
 import { DebugTools } from './DebugTools';
+import { SoundManager } from './SoundManager';
 
 const CASCADE_DELAY   = 450;
 const SWAP_ANIM_MS    = 300;
@@ -44,6 +45,7 @@ export class Game {
   private _cpuMode    = false;
   private _cpuTimer:  ReturnType<typeof setTimeout> | null = null;
   private _debug:     DebugTools;
+  private _soundManager = new SoundManager();
 
   constructor() {
     this._state = this._fresh(loadLogs());
@@ -221,6 +223,7 @@ export class Game {
 
   // ── Swap attempt ──────────────────────────────────────────────────────────
   private _animateSwap(a: Position, b: Position): void {
+    this._soundManager.play('swap');
     const start = performance.now();
     const tick = (now: number) => {
       const elapsed = now - start;
@@ -243,6 +246,7 @@ export class Game {
     if (result.positions.size === 0) {
       swapPieces(this._state.board, a, b);
       this._busy = false; // Reset busy before patch
+      this._soundManager.play('invalid');
       this._addLog('move', 'Invalid Swap', `No match formed at (${a.row},${a.col}) and (${b.row},${b.col})`);
       this._patch({ phase: 'idle', message: 'No match!' });
       setTimeout(() => {
@@ -277,12 +281,15 @@ export class Game {
     // Match quality stats
     const newBestCombo = Math.max(s.bestCombo, combo + 1);
     if (result.has5plus) {
+      this._soundManager.play('match5');
       this._patchStats({ matches5plus: s.matches5plus + 1, piecesCleared: s.piecesCleared + result.positions.size, bestCombo: newBestCombo });
       msgs.push('5-IN-A-ROW!');
     } else if (result.has4plusH || result.has4plusV) {
+      this._soundManager.play('match4');
       this._patchStats({ matches4: s.matches4 + 1, piecesCleared: s.piecesCleared + result.positions.size, bestCombo: newBestCombo });
       msgs.push('4-MATCH!');
     } else {
+      this._soundManager.play('match3');
       this._patchStats({ matches3: s.matches3 + 1, piecesCleared: s.piecesCleared + result.positions.size, bestCombo: newBestCombo });
     }
     if (combo >= 2) msgs.push(`COMBO ×${combo}!`);
@@ -352,6 +359,7 @@ export class Game {
       this._patch({ clearing: toClear.map(cl => ({ ...cl, progress })) });
       if (progress < 1) { requestAnimationFrame(tick); return; }
 
+      this._soundManager.play('clear');
       this._patch({ clearing: [] });
       removeMatched(this._state.board, result);
 
@@ -361,11 +369,12 @@ export class Game {
         const powerSuffix = finalPower > 3 ? ` (LV${finalPower} POWER!)` : '';
         const announcement = `${namePrefix}${COLOR_NAMES[firedColor].toUpperCase()} ROBOT READY!`;
         const actionDesc = `${COLOR_ATTACK[firedColor]}${powerSuffix}`;
-        
+
         this._addLog('robot', announcement, `Assembled with power level ${finalPower}. Action: ${actionDesc}`);
-        
+
         // SWITCH: Keep the "tray" full during the assembling phase so the UI shows the READY state.
         // We will clear the tray AFTER the delay, right as the attack begins shooting.
+        this._soundManager.play('robotReady');
         this._patch({ phase: 'assembling', message: announcement });
 
         // Wait 1.6 seconds to build tension
@@ -393,6 +402,7 @@ export class Game {
   }
 
   private _animateAttack(color: RobotColor, cells: { r: number; c: number }[], combo: number, gained: number, msgs: string[], isUltimate: boolean, finalPower: number): void {
+    this._soundManager.play('robotAttack');
     const start = performance.now();
     const tick = (now: number) => {
       const progress = Math.min(1, (now - start) / ATTACK_ANIM_MS);
@@ -454,6 +464,7 @@ export class Game {
       return;
     }
 
+    this._soundManager.play('fall');
     const start = performance.now();
     const tick = (now: number) => {
       const elapsed = now - start;
@@ -522,7 +533,8 @@ export class Game {
 
     const nextLevel  = targetLevel;
     const nextTarget = LEVEL_TARGETS[Math.min(nextLevel, maxLevel)];
-    
+
+    this._soundManager.play('levelUp');
     this._busy = true;
     this._patch({ level: nextLevel, targetScore: nextTarget, message: `LEVEL ${nextLevel}!` });
 

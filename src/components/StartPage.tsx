@@ -1,5 +1,8 @@
 import { useState } from 'react';
 import { InstructionsPanel } from './InstructionsPanel';
+import { SoundManager } from '../game/SoundManager';
+
+const soundManager = new SoundManager();
 
 interface Props {
   onStartOnePlayer: () => void;
@@ -56,7 +59,10 @@ export function StartPage({ onStartOnePlayer, onStartCPU }: Props) {
         flexDirection: 'column',
       }}>
         <button
-          onClick={onStartOnePlayer}
+          onClick={() => {
+            soundManager.play('click');
+            onStartOnePlayer();
+          }}
           style={{
             padding: '18px 50px',
             background: 'linear-gradient(135deg, #42A5F533 0%, #1e3a5f 100%)',
@@ -84,7 +90,10 @@ export function StartPage({ onStartOnePlayer, onStartCPU }: Props) {
         </button>
 
         <button
-          onClick={onStartCPU}
+          onClick={() => {
+            soundManager.play('click');
+            onStartCPU();
+          }}
           style={{
             padding: '18px 50px',
             background: 'linear-gradient(135deg, #66BB6A33 0%, #1a2a0a 100%)',
@@ -112,7 +121,10 @@ export function StartPage({ onStartOnePlayer, onStartCPU }: Props) {
         </button>
 
         <button
-          onClick={() => setShowInstructions(true)}
+          onClick={() => {
+            soundManager.play('click');
+            setShowInstructions(true);
+          }}
           style={{
             padding: '18px 50px',
             background: 'linear-gradient(135deg, #4488cc33 0%, #1e3a5f 100%)',
