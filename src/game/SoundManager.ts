@@ -21,6 +21,11 @@ export class SoundManager {
     this.initAudioContext();
     if (!this.audioContext) return;
 
+    // Resume audio context if suspended (required by browsers)
+    if (this.audioContext!.state === 'suspended') {
+      this.audioContext!.resume().catch(() => {});
+    }
+
     switch (type) {
       case 'swap':
         this._tone(523, 60, this.volume); // C5
@@ -75,9 +80,14 @@ export class SoundManager {
     if (!this.audioContext) {
       try {
         const AudioContextClass = (window as any).AudioContext || (window as any).webkitAudioContext;
+        if (!AudioContextClass) {
+          console.warn('Web Audio API not available in this browser');
+          return;
+        }
         this.audioContext = new AudioContextClass();
-      } catch {
-        console.warn('Web Audio API not supported');
+        console.log('AudioContext created, state:', this.audioContext!.state);
+      } catch (e) {
+        console.warn('Failed to create AudioContext:', e);
       }
     }
   }
