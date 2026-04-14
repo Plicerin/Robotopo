@@ -138,7 +138,7 @@ export default function App() {
         <GameCanvas game={game} state={state} />
         <div style={{ position: 'absolute', right: `-${144 + GAP}px`, top: 2, display: 'flex', flexDirection: 'column', gap: '18px' }}>
           <RobotPanel tray={state.tray} phase={state.phase} />
-          <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+          <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexDirection: 'column', alignItems: 'center' }}>
             <button
               onClick={handleNewGame}
               style={{ padding: '5px 16px', background: 'transparent', border: '1px solid #1e3a5f', borderRadius: '6px', color: '#4488cc', fontSize: '10px', cursor: 'pointer', letterSpacing: '1px', fontWeight: 600 }}
