@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { GameStats, AllTimeRecord } from '../game/types';
-import { VARIANT_COLORS, HEAD_VARIANTS, TORSO_VARIANTS, LEGS_VARIANTS, VARIANT_NAMES } from '../game/constants';
+import { COLOR_HEX, COLOR_NAMES, ROBOT_COLORS } from '../game/constants';
 
 interface Props {
   stats:   GameStats;
@@ -75,27 +75,20 @@ function Row({ children }: { children: React.ReactNode }) {
   );
 }
 
-// ── Part variant mini-bar ───────────────────────────────────────────────────
-function VariantBar({ variant, count }: { variant: string; count: number }) {
-  const color = VARIANT_COLORS[variant];
-  const name = VARIANT_NAMES[variant];
-
+// ── Color robot mini-bar ──────────────────────────────────────────────────────
+function ColorBar({ color, count }: { color: string; count: number }) {
+  const hex = COLOR_HEX[color as keyof typeof COLOR_HEX];
+  const name = COLOR_NAMES[color as keyof typeof COLOR_NAMES];
   return (
     <div style={{
       flex: 1,
-      background: count > 0 ? color + '11' : '#0a1220',
-      border: `1px solid ${count > 0 ? color + '44' : '#1a2d4a'}`,
+      background: count > 0 ? hex + '11' : '#0a1220',
+      border: `1px solid ${count > 0 ? hex + '44' : '#1a2d4a'}`,
       borderRadius: '6px',
       padding: '5px 6px',
-      minWidth: '60px',
+      minWidth: '52px',
     }}>
-      <div style={{
-        fontSize: '7px',
-        color: count > 0 ? color : '#3a5580',
-        letterSpacing: '0.5px',
-        marginBottom: '1px',
-        textTransform: 'uppercase',
-      }}>
+      <div style={{ fontSize: '7px', color: count > 0 ? hex : '#3a5580', letterSpacing: '0.5px', marginBottom: '1px', textTransform: 'uppercase' }}>
         {name}
       </div>
       <div style={{ fontSize: '14px', fontWeight: 700, color: count > 0 ? '#fff' : '#2a3a50' }}>
@@ -142,73 +135,28 @@ export function StatsPanel({ stats, score, records, width }: Props) {
       <Row>
         <Cell label="Pieces cleared" value={fmt(stats.piecesCleared)} />
         <Cell label="3-matches"      value={fmt(stats.matches3)} />
-        <Cell label="Combo Bot Activations" value={fmt(stats.robotsActivated)} accent="#FFD600" />
+        <Cell label="Robots launched" value={fmt(stats.robotsLaunched)} accent="#FFD600" />
         <Cell label="Best combo"     value={stats.bestCombo > 0 ? `×${stats.bestCombo}` : '—'}
               accent="#FF6D00" isRecord={isBestCombo} />
       </Row>
 
-      {/* ── SYNERGY MILSTONES ───────────────────────────────────────────── */}
-      <SectionLabel>Active Synergies (Special Sets)</SectionLabel>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '12px' }}>
-        {(['sensor', 'titan', 'vortex', 'military', 'industrial'] as const).map(syn => {
-          const count = stats.synergiesActivated[syn] || 0;
-          const isActive = count > 0;
-          const colors: Record<string, string> = {
-            sensor: '#66BB6A', titan: '#FF5252', vortex: '#9E9E9E', military: '#42A5F5', industrial: '#AB47BC'
-          };
-          return (
-            <div key={syn} style={{
-              flex: '1 1 80px',
-              padding: '6px 8px',
-              borderRadius: '6px',
-              background: isActive ? colors[syn] + '22' : '#0a1220',
-              border: `1px solid ${isActive ? colors[syn] : '#1a2d4a'}`,
-              display: 'flex',
-              flexDirection: 'column',
-              opacity: isActive ? 1 : 0.5,
-            }}>
-              <div style={{ fontSize: '7px', fontWeight: 800, color: colors[syn], marginBottom: '1px' }}>{syn.toUpperCase()}</div>
-              <div style={{ fontSize: '13px', fontWeight: 900, color: isActive ? '#fff' : '#2a3a50' }}>{count}</div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* ── Row 3: Part Usage ──────────────────────────────────────────── */}
-      <SectionLabel>Parts Collected (Variants)</SectionLabel>
-      <div style={{ marginBottom: '8px' }}>
-        <div style={{ fontSize: '7px', color: '#335588', fontWeight: 800, marginBottom: '3px' }}>HEADS</div>
-        <Row>
-          {HEAD_VARIANTS.map(v => <VariantBar key={v} variant={v} count={stats.headsCollected[v] || 0} />)}
-        </Row>
-      </div>
-
-      <div style={{ marginBottom: '8px' }}>
-        <div style={{ fontSize: '7px', color: '#335588', fontWeight: 800, marginBottom: '3px' }}>TORSOS</div>
-        <Row>
-          {TORSO_VARIANTS.map(v => <VariantBar key={v} variant={v} count={stats.torsosCollected[v] || 0} />)}
-        </Row>
-      </div>
-
-      <div style={{ marginBottom: '12px' }}>
-        <div style={{ fontSize: '7px', color: '#335588', fontWeight: 800, marginBottom: '3px' }}>LEGS</div>
-        <Row>
-          {LEGS_VARIANTS.map(v => <VariantBar key={v} variant={v} count={stats.legsCollected[v] || 0} />)}
-        </Row>
-      </div>
+      {/* ── Row 3: Robots by color ──────────────────────────────────────── */}
+      <SectionLabel>Robots by Color</SectionLabel>
+      <Row>
+        {ROBOT_COLORS.map(c => <ColorBar key={c} color={c} count={stats.robotsByColor[c] || 0} />)}
+      </Row>
 
       {/* ── Row 4: Records ─────────────────────────────────────────────── */}
       <SectionLabel>All-time records</SectionLabel>
       <Row>
-        <Cell label="Games played"    value={fmt(records.gamesPlayed)}                                   accent="#42A5F5" />
-        <Cell label="High score"      value={fmt(records.highScore)}           accent="#FFD600" isRecord={isHighScore} />
-        <Cell label="Best combo"      value={records.bestCombo > 0 ? `×${records.bestCombo}` : '—'}  accent="#FF6D00" />
-        <Cell label="Most bots"     value={fmt(records.mostRobotsOneGame)}   sub="in one game" />
+        <Cell label="Games played"  value={fmt(records.gamesPlayed)}                                  accent="#42A5F5" />
+        <Cell label="High score"    value={fmt(records.highScore)}          accent="#FFD600" isRecord={isHighScore} />
+        <Cell label="Best combo"    value={records.bestCombo > 0 ? `×${records.bestCombo}` : '—'} accent="#FF6D00" />
+        <Cell label="Most robots"   value={fmt(records.mostRobotsOneGame)}  sub="in one game" />
       </Row>
-
       <Row>
-        <Cell label="Total pieces"    value={fmt(records.totalPiecesCleared)}  />
-        <Cell label="Total robots"    value={fmt(records.totalRobots)}         accent="#AB47BC" />
+        <Cell label="Total pieces"  value={fmt(records.totalPiecesCleared)} />
+        <Cell label="Total robots"  value={fmt(records.totalRobots)}        accent="#AB47BC" />
       </Row>
     </div>
   );

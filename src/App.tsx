@@ -4,6 +4,7 @@ import { GameState, AllTimeRecord } from './game/types';
 import { GameCanvas } from './components/GameCanvas';
 import { RobotPanel } from './components/RobotPanel';
 import { StatsPanel } from './components/StatsPanel';
+import { LogPanel } from './components/LogPanel';
 import { LEVEL_TARGETS } from './game/constants';
 import { loadRecords } from './game/Records';
 import { CANVAS_W } from './game/Renderer';
@@ -83,10 +84,13 @@ export default function App() {
         )}
       </div>
 
-      {/* ── Board + Robot legend ──────────────────────────────────────────── */}
+      {/* ── Board + Workbench + Log ─────────────────────────────────────── */}
       <div style={{ display: 'flex', gap: `${GAP}px`, alignItems: 'flex-start' }}>
         <GameCanvas game={game} state={state} />
-        <RobotPanel />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+          <RobotPanel tray={state.tray} phase={state.phase} />
+          <LogPanel logs={state.logs} />
+        </div>
       </div>
 
       {/* ── Stats panel ─────────────────────────────────────────────────────── */}
@@ -94,7 +98,7 @@ export default function App() {
         stats={state.stats}
         score={state.score}
         records={records}
-        width={STATS_WIDTH}
+        width={STATS_WIDTH + 300} // Increase width to accommodate log
       />
 
       {/* ── Footer ──────────────────────────────────────────────────────────── */}

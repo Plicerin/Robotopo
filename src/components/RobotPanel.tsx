@@ -1,85 +1,160 @@
-import { ReactNode } from 'react';
-import { VARIANT_COLORS, VARIANT_NAMES, VARIANT_DESCRIPTIONS, HEAD_VARIANTS, TORSO_VARIANTS, LEGS_VARIANTS, ARM_VARIANTS } from '../game/constants';
+import { Tray } from '../game/types';
+import { COLOR_HEX, COLOR_NAMES, COLOR_ATTACK } from '../game/constants';
 
-function VariantItem({ variant, type }: { variant: string, type: 'HEAD' | 'TORSO' | 'LEGS' | 'ARM' }): ReactNode {
-  const color = VARIANT_COLORS[variant];
+interface Props {
+  tray: Tray;
+  phase?: string;
+}
+
+const SLOTS: Array<{ key: 'headColor' | 'torsoColor' | 'legsColor'; powerKey: 'headPower' | 'torsoPower' | 'legsPower'; label: string }> = [
+  { key: 'headColor',  powerKey: 'headPower',  label: 'HEAD'  },
+  { key: 'torsoColor', powerKey: 'torsoPower', label: 'TORSO' },
+  { key: 'legsColor',  powerKey: 'legsPower',  label: 'LEGS'  },
+];
+
+export function RobotPanel({ tray, phase }: Props) {
+  const parts    = SLOTS.map(s => tray[s.key]).filter(Boolean) as RobotColor[];
+  const filled   = parts.length;
+  const isReady  = filled === 3 || phase === 'assembling';
+  
+  // Average power level for UI
+  const avgPower = Math.ceil(SLOTS.reduce((acc, s) => acc + tray[s.powerKey], 0) / Math.max(1, filled));
+
+  // Majority color for UI glow/theme
+  let themeColor = '#1e3a5f';
+  if (filled > 0) {
+    const counts: Record<string, number> = {};
+    parts.forEach(c => counts[c] = (counts[c] || 0) + 1);
+    const sorted = Object.entries(counts).sort((a,b) => b[1] - a[1]);
+    themeColor = COLOR_HEX[sorted[0][0] as RobotColor];
+  }
 
   return (
     <div style={{
-      background:   '#0a1220',
-      border:       `1px solid ${color}44`,
-      borderRadius: '8px',
-      padding:      '8px',
-      marginBottom: '6px',
+      width:        '160px',
+      background:   '#060d18',
+      border:       `1px solid ${themeColor}55`,
+      borderRadius: '12px',
+      padding:      '14px 12px',
       display:      'flex',
-      flexDirection: 'column',
-      gap:          '4px',
+      flexDirection:'column',
+      gap:          '10px',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-        <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: color, boxShadow: `0 0 4px ${color}` }}/>
-        <span style={{ fontWeight: 700, fontSize: '10px', color: '#fff', letterSpacing: '0.5px' }}>
-          {VARIANT_NAMES[variant]}
-        </span>
-        <span style={{ fontSize: '8px', color: color, fontWeight: 800, marginLeft: 'auto' }}>{type}</span>
+      {/* Header */}
+      <div style={{ textAlign: 'center', fontSize: '10px', fontWeight: 800, letterSpacing: '2px', color: themeColor }}>
+        WORKBENCH {avgPower > 3 && <span style={{ color: '#FFD600' }}>★LV{avgPower-2}</span>}
       </div>
-      <div style={{ fontSize: '9px', color: '#4466aa', lineHeight: 1.3 }}>
-        {VARIANT_DESCRIPTIONS[variant]}
+
+      {/* Assembly status */}
+      <div style={{
+        textAlign:    'center',
+        fontSize:     '11px',
+        fontWeight:   700,
+        color:        filled > 0 ? themeColor : '#2a4060',
+        background:   isReady ? `${themeColor}33` : filled > 0 ? `${themeColor}18` : '#0a1220',
+        border:       `1px solid ${isReady ? themeColor : filled > 0 ? themeColor + '44' : '#1e3a5f'}`,
+        borderRadius: '6px',
+        padding:      '5px 0',
+        letterSpacing:'1px',
+        boxShadow:    isReady ? `0 0 10px ${themeColor}44` : 'none',
+        animation:    isReady ? 'pulse 1.5s infinite ease-in-out' : 'none',
+      }}>
+        {filled === 0 ? '— empty —' : filled < 3 ? 'In Progress' : 'READY!'}
+      </div>
+
+      {/* 3 slots */}
+      {SLOTS.map(({ key, powerKey, label }) => {
+        const color = tray[key];
+        const power = tray[powerKey];
+        const hex = color ? COLOR_HEX[color] : '#1e3a5f';
+        const done = !!color;
+        return (
+          <div key={key} style={{
+            display:      'flex',
+            alignItems:   'center',
+            gap:          '8px',
+            background:   done ? `${hex}18` : '#0a1220',
+            border:       `1px solid ${done ? hex + '66' : '#1e3a5f'}`,
+            borderRadius: '8px',
+            padding:      '8px 10px',
+          }}>
+            <div style={{
+              width:        '10px',
+              height:       '10px',
+              borderRadius: '50%',
+              background:   done ? hex : 'transparent',
+              border:       `2px solid ${done ? hex : '#2a4060'}`,
+              boxShadow:    done ? `0 0 6px ${hex}` : 'none',
+              flexShrink:   0,
+            }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+              <span style={{ fontSize: '10px', fontWeight: 700, color: done ? hex : '#2a4060', letterSpacing: '1px' }}>
+                {label}
+              </span>
+              {done && power > 3 && (
+                <span style={{ fontSize: '8px', fontWeight: 800, color: '#FFD600' }}>POWER {power}</span>
+              )}
+            </div>
+            {done && (
+              <span style={{ marginLeft: 'auto', fontSize: '9px', fontWeight: 800, color: hex }}>
+                {COLOR_NAMES[color].substring(0, 3).toUpperCase()}
+              </span>
+            )}
+          </div>
+        );
+      })}
+
+      {/* Progress / attack hint */}
+      <div style={{
+        textAlign:    'center',
+        fontSize:     '9px',
+        color:        isReady ? themeColor : '#2a4060',
+        lineHeight:   1.4,
+        padding:      '6px 4px',
+        borderTop:    '1px solid #1e3a5f',
+      }}>
+        {isReady 
+          ? (() => {
+              const majorityColor = parts.length > 0 ? parts.reduce((a, b) => 
+                parts.filter(v => v === a).length >= parts.filter(v => v === b).length ? a : b
+              ) : 'blue' as RobotColor; // Fallback during state reset animation
+              const avgPower = Math.ceil((tray.headPower + tray.torsoPower + tray.legsPower) / 3);
+              const bonus = parts.every(v => v === parts[0]) ? ' (ULTIMATE x2)' : '';
+              
+              let damageText = '';
+              const count = avgPower > 5 ? Math.max(3, avgPower - 3) : Math.max(1, avgPower - 2);
+              if (majorityColor === 'orange') damageText = `Clears ${count} most populated rows`;
+              else if (majorityColor === 'blue') damageText = `Clears ${count} most populated columns`;
+              else if (majorityColor === 'yellow') {
+                const rad = avgPower > 5 ? Math.max(5, avgPower - 1) : Math.floor((count + 1) / 2);
+                const size = rad * 2 + 1;
+                damageText = `Clears ${size}x${size} area`;
+              }
+              else if (majorityColor === 'green') damageText = `Clears the ${count} most common colors`;
+              else if (majorityColor === 'purple') damageText = `Clears ${15 + (count - 1) * 8} pieces inward`;
+
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <strong style={{ color: themeColor, fontSize: '10px' }}>
+                    READY: {COLOR_ATTACK[majorityColor]}
+                  </strong>
+                  <div style={{ 
+                    background: themeColor + '22', 
+                    color: '#fff', 
+                    padding: '4px', 
+                    borderRadius: '4px',
+                    border: `1px solid ${themeColor}44`,
+                    fontSize: '9px',
+                    fontWeight: 600
+                  }}>
+                    {damageText}{bonus}
+                  </div>
+                </div>
+              );
+            })()
+          : `${filled} / 3 parts collected`}
       </div>
     </div>
   );
 }
 
-export function RobotPanel() {
-  return (
-    <div style={{
-      // ... (style stays same)
-    }}>
-      <div style={{
-        textAlign:     'center',
-        fontSize:      '11px',
-        fontWeight:    700,
-        letterSpacing: '2px',
-        color:         '#3366aa',
-        marginBottom:  '16px',
-        textTransform: 'uppercase',
-      }}>
-        Robot Assembly
-      </div>
-
-      <div style={{ marginBottom: '16px' }}>
-        <div style={{ fontSize: '9px', fontWeight: 800, color: '#3366aa', marginBottom: '8px', borderBottom: '1px solid #1e3a5f', paddingBottom: '4px' }}>HEADS: DAMAGE MODE</div>
-        {HEAD_VARIANTS.map(v => <VariantItem key={v} variant={v} type="HEAD" />)}
-      </div>
-
-      <div style={{ marginBottom: '16px' }}>
-        <div style={{ fontSize: '9px', fontWeight: 800, color: '#3366aa', marginBottom: '8px', borderBottom: '1px solid #1e3a5f', paddingBottom: '4px' }}>TORSOS: TARGETING</div>
-        {TORSO_VARIANTS.map(v => <VariantItem key={v} variant={v} type="TORSO" />)}
-      </div>
-
-      <div style={{ marginBottom: '16px' }}>
-        <div style={{ fontSize: '9px', fontWeight: 800, color: '#3366aa', marginBottom: '8px', borderBottom: '1px solid #1e3a5f', paddingBottom: '4px' }}>ARMS: EXTRA STRIKES</div>
-        {ARM_VARIANTS.map(v => <VariantItem key={v} variant={v} type="ARM" />)}
-      </div>
-
-      <div style={{ marginBottom: '16px' }}>
-        <div style={{ fontSize: '9px', fontWeight: 800, color: '#3366aa', marginBottom: '8px', borderBottom: '1px solid #1e3a5f', paddingBottom: '4px' }}>LEGS: SCALE</div>
-        {LEGS_VARIANTS.map(v => <VariantItem key={v} variant={v} type="LEGS" />)}
-      </div>
-
-      <div style={{
-        marginTop:  '10px',
-        padding:    '10px',
-        background: '#0a1525',
-        borderRadius: '7px',
-        border:     '1px solid #1e3a5f88',
-      }}>
-        <div style={{ fontSize: '10px', color: '#5577cc', lineHeight: 1.6, textAlign: 'center' }}>
-          <strong style={{ color: '#7799ff', display: 'block', marginBottom: '4px' }}>COMBO RULE</strong>
-          Stack Head/Torso/Legs vertically. Add <strong>Arms</strong> to the left or right of the Torso for extra damage. 
-          <br/>
-          <span style={{ color: '#ffaa00' }}>Both arms = SUPER ATTACK!</span>
-        </div>
-      </div>
-    </div>
-  );
-}

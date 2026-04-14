@@ -19,7 +19,14 @@ Instead of requiring a vertical stack (Head-Torso-Legs) to trigger a robot attac
 - **Leveling**: Parts on the board can level up (LV1 -> LV2 -> LV3 -> LV4 -> MAX) before being collected.
 - **MAX Pieces**: Collected MAX pieces provide a significant power multiplier to the final assembled robot attack.
 
-## 🛠️ Visual & UI Requirements
+## � Current Implementation Status (Workbench v2)
+- [x] Dual-mode Match Engine: Color matches clear board; exact-type matches fill tray.
+- [x] Multi-color "Mixed Chassis" Support: Majority-rules attack color; ultimate mono-color bonuses.
+- [x] Power Scaling (3-8 parts): Match length (3-8) directly scales the attack magnitude.
+- [x] Dynamic Asset System: Using Blue Robot parts as base images with real-time hue-tinting for other colors.
+- [ ] Asset Replacement: Replace tinted versions with unique color-specific artwork (Green, Orange, Purple, Yellow) as they are finished.
+
+## �🛠️ Visual & UI Requirements
 - **The Workbench**: A dedicated side-panel UI showing the 4 slots.
 - **Assembly Animation**: Once the 4th piece is collected, the board pauses for a high-quality assembly sequence involving the chosen parts.
 - **Modular Variety**: The "Weapon" slot determines the attack pattern (AOE, Piercing, Multi-Target, or Bottom-Clear).

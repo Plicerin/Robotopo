@@ -1,20 +1,20 @@
-import { GameState, GameStats, Position, HeadVariant, TorsoVariant, LegsVariant, isRobotPart } from './types';
+import { GameState, GameStats, Position, Tray, RobotColor, getColor, getBodyPart } from './types';
 import {
   initBoard, swapPieces, isAdjacent,
   findMatches, removeMatched,
   applyGravity, fillEmpty,
-  applyComboRobotPower,
-  getMagnetMoves, applyMagnetPull,
+  computeRobotAttack, clearAttackCells,
   hasValidMoves, shuffleBoard,
 } from './Board';
-import { SCORE_PER_PIECE, ROBOT_BONUS, LEVEL_TARGETS } from './constants';
+import { SCORE_PER_PIECE, ROBOT_BONUS, LEVEL_TARGETS, COLOR_NAMES, COLOR_ATTACK } from './constants';
 import { findBestMove } from './AI';
-import { commitGame } from './Records';
+import { commitGame, loadLogs, saveLogs } from './Records';
+import { DebugTools } from './DebugTools';
 
 const CASCADE_DELAY   = 450;
 const SWAP_ANIM_MS    = 300;
 const CLEAR_ANIM_MS   = 400;
-const MAGNET_ANIM_MS  = 750;
+const ATTACK_ANIM_MS  = 750;
 const FALL_ANIM_MS    = 350;
 const MESSAGE_TIMEOUT = 1300;
 const CPU_THINK_MS    = 800;
@@ -23,20 +23,17 @@ type StateListener = (state: GameState) => void;
 
 function freshStats(): GameStats {
   return {
-    startTime:        Date.now(),
-    movesAttempted:   0,
-    validMoves:       0,
-    piecesCleared:    0,
-    matches3:         0,
-    matches4:         0,
-    matches5plus:     0,
-    bestCombo:        0,
-    robotsActivated:  0,
-    synergiesActivated: { sensor: 0, titan: 0, vortex: 0, military: 0, industrial: 0 },
-    headsCollected:   { vortex: 0, hammer: 0, laser: 0 },
-    torsosCollected:  { sensor: 0, wild: 0, random: 0 },
-    legsCollected:    { soldier: 0, scout: 0, titan: 0 },
-    shuffles:         0,
+    startTime:      Date.now(),
+    movesAttempted: 0,
+    validMoves:     0,
+    piecesCleared:  0,
+    matches3:       0,
+    matches4:       0,
+    matches5plus:   0,
+    bestCombo:      0,
+    robotsLaunched: 0,
+    robotsByColor:  { blue: 0, yellow: 0, green: 0, purple: 0, orange: 0 },
+    shuffles:       0,
   };
 }
 
@@ -46,9 +43,11 @@ export class Game {
   private _busy       = false;
   private _cpuMode    = false;
   private _cpuTimer:  ReturnType<typeof setTimeout> | null = null;
+  private _debug:     DebugTools;
 
   constructor() {
     this._state = this._fresh();
+    this._debug = new DebugTools(this);
   }
 
   private _fresh(): GameState {
@@ -61,13 +60,30 @@ export class Game {
       falling:     [],
       clearing:    [],
       magnetizing: [],
+      robotAttack: null,
+      tray:        { headColor: null, headPower: 0, torsoColor: null, torsoPower: 0, legsColor: null, legsPower: 0 },
       score:       0,
       level:       1,
       targetScore: LEVEL_TARGETS[1],
       combo:       0,
       message:     '',
       stats:       stats,
+      logs:        loadLogs(),
     };
+  }
+
+  private _addLog(type: 'move' | 'robot', title: string, detail: string): void {
+    const entry = {
+      id: Date.now() + Math.random(),
+      type,
+      title,
+      detail,
+      timestamp: Date.now(),
+    };
+    // Keep last 50 logs
+    const logs = [entry, ...this._state.logs].slice(0, 50);
+    saveLogs(logs);
+    this._patch({ logs });
   }
 
   subscribe(fn: StateListener): () => void {
@@ -85,6 +101,39 @@ export class Game {
 
   private _patchStats(delta: Partial<GameStats>): void {
     this._state = { ...this._state, stats: { ...this._state.stats, ...delta } };
+  }
+
+  /**
+   * DEBUG ONLY: Forces a robot attack of the given color and power.
+   */
+  public debugForceRobot(color: RobotColor, power: number): void {
+    const announcement = `${COLOR_NAMES[color].toUpperCase()} ROBOT READY!`;
+    const actionDesc = `${COLOR_ATTACK[color]} (LV${power} POWER!)`;
+    
+    this._addLog('robot', announcement, `DEBUG: Forcing robot with power level ${power}. Action: ${actionDesc}`);
+    
+    // Set tray to simulate the state
+    const fakeTray = {
+        headColor: color, headPower: power,
+        torsoColor: color, torsoPower: power,
+        legsColor: color, legsPower: power
+    };
+    
+    this._patch({ phase: 'assembling', message: announcement, tray: fakeTray });
+    this._busy = true;
+
+    setTimeout(() => {
+      const emptyTray = { headColor: null, headPower: 0, torsoColor: null, torsoPower: 0, legsColor: null, legsPower: 0 };
+      const attackCells = computeRobotAttack(this._state.board, color, power);
+      this._addLog('robot', `${COLOR_NAMES[color].toUpperCase()} ATTACK`, `Cleared ${attackCells.length} cells.`);
+
+      this._patch({ 
+        tray: emptyTray,
+        robotAttack: { color, cells: attackCells, progress: 0 }, 
+        message: `${announcement}  ·  ${actionDesc}` 
+      });
+      this._animateAttack(color, attackCells, 0, 0, [announcement], true, power);
+    }, 1600);
   }
 
   get state(): GameState { return this._state; }
@@ -138,7 +187,7 @@ export class Game {
       this._cpuTimer = null;
       if (!this._cpuMode || this._busy) return;
       
-      const move = findBestMove(this._state.board);
+      const move = findBestMove(this._state.board, this._state.tray);
       if (!move) { 
         this._patch({ message: 'CPU: No moves found' }); 
         return; 
@@ -194,12 +243,14 @@ export class Game {
     if (result.positions.size === 0) {
       swapPieces(this._state.board, a, b);
       this._busy = false; // Reset busy before patch
+      this._addLog('move', 'Invalid Swap', `No match formed at (${a.row},${a.col}) and (${b.row},${b.col})`);
       this._patch({ phase: 'idle', message: 'No match!' });
       setTimeout(() => {
         this._patch({ message: '' });
         if (this._cpuMode) this._scheduleCpuMove();
       }, MESSAGE_TIMEOUT);
     } else {
+      this._addLog('move', 'Valid Swap', `Match formed at (${a.row},${a.col}) and (${b.row},${b.col})`);
       this._patchStats({ validMoves: this._state.stats.validMoves + 1 });
       this._resolveLoop(0);
     }
@@ -210,7 +261,7 @@ export class Game {
     const result = findMatches(this._state.board);
 
     if (result.positions.size === 0) {
-      this._busy = false; // Reset busy first
+      this._busy = false;
       this._patch({ phase: 'idle', combo: 0, message: '' });
       this._checkLevelUp();
       this._checkDeadlock();
@@ -218,127 +269,150 @@ export class Game {
       return;
     }
 
-    let gained = 0;
     const msgs: string[] = [];
     const s = this._state.stats;
-
     const multiplier = 1 + combo * 0.5;
-    gained = Math.round(result.positions.size * SCORE_PER_PIECE * multiplier);
-
-    // ── Check for "Pure Robot Match" Bonus ────────────────────────────────────
-    const anyRegularCleared = Array.from(result.positions).some(k => {
-      const [kr, kc] = k.split(',').map(Number);
-      const piece = this._state.board[kr][kc];
-      return piece && !isRobotPart(piece.type);
-    });
-
-    if (!anyRegularCleared && result.positions.size >= 3) {
-      // PURE ROBOT MATCH! Huge score bonus
-      gained += 1500;
-      msgs.push('PURE ROBOT SYNERGY! +1500');
-    }
+    let gained = Math.round(result.positions.size * SCORE_PER_PIECE * multiplier);
 
     // Match quality stats
     const newBestCombo = Math.max(s.bestCombo, combo + 1);
-    if      (result.has5plus)                          { this._patchStats({ matches5plus: s.matches5plus + 1, piecesCleared: s.piecesCleared + result.positions.size, bestCombo: newBestCombo }); msgs.push('5-IN-A-ROW!'); }
-    else if (result.has4plusH || result.has4plusV)     { this._patchStats({ matches4:    s.matches4    + 1, piecesCleared: s.piecesCleared + result.positions.size, bestCombo: newBestCombo }); msgs.push('4-MATCH!'); }
-    else                                               { this._patchStats({ matches3:    s.matches3    + 1, piecesCleared: s.piecesCleared + result.positions.size, bestCombo: newBestCombo }); }
+    if (result.has5plus) {
+      this._patchStats({ matches5plus: s.matches5plus + 1, piecesCleared: s.piecesCleared + result.positions.size, bestCombo: newBestCombo });
+      msgs.push('5-IN-A-ROW!');
+    } else if (result.has4plusH || result.has4plusV) {
+      this._patchStats({ matches4: s.matches4 + 1, piecesCleared: s.piecesCleared + result.positions.size, bestCombo: newBestCombo });
+      msgs.push('4-MATCH!');
+    } else {
+      this._patchStats({ matches3: s.matches3 + 1, piecesCleared: s.piecesCleared + result.positions.size, bestCombo: newBestCombo });
+    }
     if (combo >= 2) msgs.push(`COMBO ×${combo}!`);
 
-    // ── Apply Robot Powers ────────────────────────────────────────────────────
-    for (const robotCombo of result.combos) {
-      const rs = this._state.stats;
-      applyComboRobotPower(this._state.board, robotCombo);
-      
-      const nextSynergies = { ...rs.synergiesActivated };
-      if (robotCombo.synergy) {
-        nextSynergies[robotCombo.synergy] = (nextSynergies[robotCombo.synergy] || 0) + 1;
-        msgs.push(`${robotCombo.synergy.toUpperCase()} SYNERGY!`);
-      }
+    // ── Tray logic (process BEFORE removing from board) ───────────────────
+    let tray = { ...this._state.tray };
+    let robotFired = false;
+    let firedColor: RobotColor | null = null;
+    let isUltimate = false;
+    let finalPower = 3;
 
-      this._patchStats({ 
-        robotsActivated: rs.robotsActivated + 1,
-        synergiesActivated: nextSynergies,
-        headsCollected:  { ...rs.headsCollected, [robotCombo.head]: rs.headsCollected[robotCombo.head] + 1 },
-        torsosCollected: { ...rs.torsosCollected, [robotCombo.torso]: rs.torsosCollected[robotCombo.torso] + 1 },
-        legsCollected:   { ...rs.legsCollected, [robotCombo.legs]: rs.legsCollected[robotCombo.legs] + 1 },
-      });
+    for (const [type, power] of result.matchedTypes) {
+      const color = getColor(type);
+      const body  = getBodyPart(type);
       
-      msgs.push(`ROBOT ACTIVATED: ${robotCombo.head}-${robotCombo.torso}-${robotCombo.legs}!`);
-      gained += ROBOT_BONUS;
+      // Only lock in if the slot is currently empty (null)
+      if (body === 'head' && tray.headColor === null)  { 
+        tray.headColor  = color; tray.headPower  = power; 
+        this._addLog('move', 'Part Collected', `HEAD: ${COLOR_NAMES[color].toUpperCase()} (Power ${power})`);
+      }
+      if (body === 'torso' && tray.torsoColor === null) { 
+        tray.torsoColor = color; tray.torsoPower = power; 
+        this._addLog('move', 'Part Collected', `TORSO: ${COLOR_NAMES[color].toUpperCase()} (Power ${power})`);
+      }
+      if (body === 'legs' && tray.legsColor === null)  { 
+        tray.legsColor  = color; tray.legsPower  = power; 
+        this._addLog('move', 'Part Collected', `LEGS: ${COLOR_NAMES[color].toUpperCase()} (Power ${power})`);
+      }
     }
 
-    // ── Remove matched tiles ──────────────────────────────────────────────────
-    const toClear: { r: number; c: number; progress: number; type: any }[] = [];
-    for (const key of result.positions) {
+    if (tray.headColor && tray.torsoColor && tray.legsColor) {
+      robotFired = true;
+      const counts: Record<RobotColor, number> = { blue: 0, yellow: 0, green: 0, purple: 0, orange: 0 };
+      counts[tray.headColor]++;
+      counts[tray.torsoColor]++;
+      counts[tray.legsColor]++;
+      
+      let maxCount = 0;
+      for (const color of Object.keys(counts) as RobotColor[]) {
+        if (counts[color] > maxCount) { maxCount = counts[color]; firedColor = color; }
+      }
+      
+      if (maxCount === 1) {
+        const colors = [tray.headColor, tray.torsoColor, tray.legsColor];
+        firedColor = colors[Math.floor(Math.random() * 3)];
+      }
+
+      isUltimate = (maxCount === 3);
+      // Final power is based on the average power of the 3 parts (rounded up)
+      // Ultimate bonus: double the power if matching 3 of same color
+      const basePower = Math.ceil((tray.headPower + tray.torsoPower + tray.legsPower) / 3);
+      finalPower = isUltimate ? basePower * 2 : basePower;
+    }
+
+    // ── Animate clear ──────────────────────────────────────────────────────
+    const toClear = Array.from(result.positions).map(key => {
       const [r, c] = key.split(',').map(Number);
       const piece = this._state.board[r][c];
-      if (piece) {
-        toClear.push({ r, c, progress: 0, type: piece.type });
-      }
-    }
+      return { r, c, progress: 0, type: piece!.type };
+    });
 
-    this._patch({ clearing: toClear, phase: 'animating' });
+    this._patch({ clearing: toClear, tray, phase: 'animating' });
 
-    // Animate Clear
     const start = performance.now();
     const tick = (now: number) => {
-      const elapsed = now - start;
-      const progress = Math.min(1, elapsed / CLEAR_ANIM_MS);
-      this._patch({ clearing: toClear.map(c => ({ ...c, progress })) });
-      if (progress < 1) requestAnimationFrame(tick);
-      else {
-        this._patch({ clearing: [] });
-        
-        // MAGNET MECHANIC: Find logic moves
-        const magnetMoves = getMagnetMoves(this._state.board, result);
-        
-        // CAUTION: removeMatched must happen AFTER getMagnetMoves but BEFORE applyMagnetPull
-        // so that the magnet pieces have a target (NULL) but haven't been cleared yet.
-        removeMatched(this._state.board, result);
+      const progress = Math.min(1, (now - start) / CLEAR_ANIM_MS);
+      this._patch({ clearing: toClear.map(cl => ({ ...cl, progress })) });
+      if (progress < 1) { requestAnimationFrame(tick); return; }
 
-        if (magnetMoves.length > 0) {
-          console.log('[Game] START MAGNET PULSE. Moves:', magnetMoves);
-          msgs.push('MAGNET PULSE!');
-          const startMagnet = performance.now();
-          const toMagnet = magnetMoves.map(m => ({ 
-            r: m.r, c: m.c, targetR: m.targetR, targetC: m.targetC, progress: 0, type: m.piece.type
-          }));
+      this._patch({ clearing: [] });
+      removeMatched(this._state.board, result);
+
+      // ── Robot Tension Delay ───────────────────────────────────────────
+      if (robotFired && firedColor) {
+        const namePrefix = isUltimate ? 'ULTIMATE ' : '';
+        const powerSuffix = finalPower > 3 ? ` (LV${finalPower} POWER!)` : '';
+        const announcement = `${namePrefix}${COLOR_NAMES[firedColor].toUpperCase()} ROBOT READY!`;
+        const actionDesc = `${COLOR_ATTACK[firedColor]}${powerSuffix}`;
+        
+        this._addLog('robot', announcement, `Assembled with power level ${finalPower}. Action: ${actionDesc}`);
+        
+        // SWITCH: Keep the "tray" full during the assembling phase so the UI shows the READY state.
+        // We will clear the tray AFTER the delay, right as the attack begins shooting.
+        this._patch({ phase: 'assembling', message: announcement });
+
+        // Wait 1.6 seconds to build tension
+        setTimeout(() => {
+          // Clear the workbench tray NOW, as the firing animation begins
+          const emptyTray = { headColor: null, headPower: 0, torsoColor: null, torsoPower: 0, legsColor: null, legsPower: 0 };
           
-          let lastProgress = -1;
-          const tickMagnet = (nowM: number) => {
-            const elapsedM = nowM - startMagnet;
-            // SLOW & SMOOTH: Using a Sine-based ease-in-out for more deliberate motion
-            const t = Math.min(1, elapsedM / MAGNET_ANIM_MS);
-            const progressM = 0.5 - Math.cos(t * Math.PI) / 2; 
-            
-            if (progressM > lastProgress) {
-              lastProgress = progressM;
-              this._patch({ magnetizing: toMagnet.map(tm => ({ ...tm, progress: progressM })), phase: 'animating' });
-            }
-            
-            if (t < 1) {
-              requestAnimationFrame(tickMagnet);
-            } else {
-              console.log('[Game] MAGNET ANIM DONE. Executing moves:', magnetMoves);
-              this._patch({ magnetizing: [] });
-              
-              // 1. Permanently update the board state with the new positions
-              const success = applyMagnetPull(this._state.board, result, magnetMoves);
-              console.log('[Game] applyMagnetPull success:', success);
-              
-              // 2. PAUSE before the next sequence
-              // This lets the player process the movement before gravity/new matches kick in
-              setTimeout(() => {
-                this._animateFalling(combo, gained, msgs);
-              }, 250); // Definitive 250ms pause
-            }
-          };
-          requestAnimationFrame(tickMagnet);
-        } else {
-          this._animateFalling(combo, gained, msgs);
-        }
+          const attackCells = computeRobotAttack(this._state.board, firedColor!, finalPower);
+          this._addLog('robot', `${COLOR_NAMES[firedColor!].toUpperCase()} ATTACK`, `Cleared ${attackCells.length} cells.`);
+
+          this._patch({ 
+            tray: emptyTray,
+            robotAttack: { color: firedColor!, cells: attackCells, progress: 0 }, 
+            message: `${announcement}  ·  ${actionDesc}` 
+          });
+          this._animateAttack(firedColor!, attackCells, combo, gained, msgs, isUltimate, finalPower);
+        }, 1600);
+      } else {
+        // Not a robot turn, clear tray normally (likely just matching colors)
+        this._patch({ tray }); 
+        this._animateFalling(combo, gained, msgs);
       }
+    };
+    requestAnimationFrame(tick);
+  }
+
+  private _animateAttack(color: RobotColor, cells: { r: number; c: number }[], combo: number, gained: number, msgs: string[], isUltimate: boolean, finalPower: number): void {
+    const start = performance.now();
+    const tick = (now: number) => {
+      const progress = Math.min(1, (now - start) / ATTACK_ANIM_MS);
+      this._patch({ robotAttack: { color, cells, progress } });
+      if (progress < 1) { requestAnimationFrame(tick); return; }
+
+      // Animation done — apply the attack
+      this._patch({ robotAttack: null });
+      const attackCleared = clearAttackCells(this._state.board, cells);
+      const rs = this._state.stats;
+      this._patchStats({
+        robotsLaunched: rs.robotsLaunched + 1,
+        robotsByColor: { ...rs.robotsByColor, [color]: rs.robotsByColor[color] + 1 },
+      });
+      
+      const bonusBase = isUltimate ? ROBOT_BONUS * 2 : ROBOT_BONUS;
+      // Bonus scales with power (3rd piece is 100%, 4th is 125%, 5th is 150%, etc)
+      const powerMult = 1 + (finalPower - 3) * 0.25;
+      gained += Math.round(bonusBase * powerMult) + attackCleared.size * SCORE_PER_PIECE;
+      this._animateFalling(combo, gained, msgs);
     };
     requestAnimationFrame(tick);
   }
