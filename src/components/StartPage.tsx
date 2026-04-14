@@ -17,7 +17,7 @@ export function StartPage({ onStartOnePlayer, onStartCPU }: Props) {
       flexDirection: 'column',
       alignItems: 'center',
       justifyContent: 'center',
-      gap: '15px',
+      gap: '30px',
       background: 'linear-gradient(135deg, #0a0f1f 0%, #1a1f3a 100%)',
       userSelect: 'none',
     }}>
@@ -34,7 +34,6 @@ export function StartPage({ onStartOnePlayer, onStartCPU }: Props) {
           maxHeight: '250px',
           filter: 'drop-shadow(0 0 30px #42A5F588)',
           marginTop: '-10px',
-          animation: 'float 3s ease-in-out infinite',
         }}
       />
 
