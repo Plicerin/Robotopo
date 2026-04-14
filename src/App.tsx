@@ -8,8 +8,10 @@ import { StartPage } from './components/StartPage';
 import { LEVEL_TARGETS } from './game/constants';
 import { loadRecords } from './game/Records';
 import { CANVAS_W } from './game/Renderer';
+import { MusicManager } from './game/MusicManager';
 
 const game = new Game();
+const music = new MusicManager('/assets/Pixel_Drift.mp3');
 
 // Board canvas width + gap + robot panel width  (must match layout widths below)
 const ROBOT_PANEL_W = 180;
@@ -31,6 +33,12 @@ export default function App() {
     const onUnload = () => { game.commitAndRestart(); };
     window.addEventListener('beforeunload', onUnload);
     return () => window.removeEventListener('beforeunload', onUnload);
+  }, []);
+
+  // Background music
+  useEffect(() => {
+    music.play();
+    return () => music.pause();
   }, []);
 
   function startGame(cpuEnabled: boolean) {
