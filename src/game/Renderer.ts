@@ -1,17 +1,33 @@
-import { PieceType, Position, GameState, RobotColor, getColor, getBodyPart } from './types';
-import { BOARD_ROWS, BOARD_COLS, CELL_SIZE, BOARD_PAD, COLOR_HEX, COLOR_DARK, COLOR_LIGHT } from './constants';
+import { PieceType, Position, GameState, RobotColor, getColor, getBodyPart, getVariant } from './types';
+import { BOARD_ROWS, BOARD_COLS, CELL_SIZE, BOARD_PAD, COLOR_HEX, COLOR_DARK, COLOR_LIGHT, PIECE_COLORS, PIECE_DARK, PIECE_LIGHT, VARIANT_COLORS } from './constants';
 
 export const CANVAS_W = BOARD_PAD * 2 + BOARD_COLS * CELL_SIZE;
 export const CANVAS_H = BOARD_PAD * 2 + BOARD_ROWS * CELL_SIZE;
 
-// ── Image Assets ─────────────────────────────────────────────────────────────
+// ── Type definitions ──────────────────────────────────────────────────────────
+type RegularType = 'nut' | 'battery' | 'bolt' | 'fuse' | 'chip' | 'gear';
+
+// ── Image Assets ──────────────────────────────────────────────────────────────
 const ROBOT_IMAGES: Record<string, HTMLImageElement> = {};
+const PIECE_IMAGES: Record<RegularType, HTMLImageElement> = {} as any;
 const TINT_CACHE: Map<string, HTMLCanvasElement> = new Map();
 
 const ROBOT_ASSET_PATHS: Record<string, string> = {
-  'head_blue': '/assets/blue_head.png',
-  'torso_blue': '/assets/blue_torso.png',
-  'legs_blue': '/assets/blue_legs.png',
+  'head_blue':    '/assets/blue_head.png',
+  'torso_blue':   '/assets/blue_torso.png',
+  'legs_blue':    '/assets/blue_legs.png',
+  'head_green':   '/assets/green_head.png',
+  'torso_green':  '/assets/green_torso.png',
+  'legs_green':   '/assets/green_legs.png',
+  'head_magenta': '/assets/magenta_head.png',
+  'torso_magenta':'/assets/magenta_torso.png',
+  'legs_magenta': '/assets/magenta_legs.png',
+  'head_orange':  '/assets/orange_head.png',
+  'torso_orange': '/assets/orange_torso.png',
+  'legs_orange':  '/assets/orange_legs.png',
+  'head_yellow':  '/assets/yellow_head.png',
+  'torso_yellow': '/assets/yellow_torso.png',
+  'legs_yellow':  '/assets/yellow_legs.png',
 };
 
 function loadRobotImages() {
@@ -103,16 +119,20 @@ function drawPiece(ctx: CanvasRenderingContext2D, type: PieceType, cx: number, c
   if (img && img.complete && img.naturalWidth > 0) {
     const pX = cx - sz * 0.4, pY = cy - sz * 0.4, pS = sz * 0.8;
     ctx.save();
-    
-    // Always use the tinting engine for all colors (including blue) 
-    // to ensure visual uniformity across the board.
-    const tinted = getTintedImage(img, colorValue);
-    if (tinted) {
-      ctx.drawImage(tinted, pX, pY, pS, pS);
+
+    if (isTinted) {
+      // Fallback: tint the blue asset to approximate the target color
+      const tinted = getTintedImage(img, colorValue);
+      if (tinted) {
+        ctx.drawImage(tinted, pX, pY, pS, pS);
+      } else {
+        ctx.drawImage(img, pX, pY, pS, pS);
+      }
     } else {
+      // Direct color-specific asset — draw as-is
       ctx.drawImage(img, pX, pY, pS, pS);
     }
-    
+
     ctx.restore();
     return;
   }
@@ -478,7 +498,7 @@ function drawRobotArmShape(ctx: CanvasRenderingContext2D, cx: number, cy: number
 }
 
 function drawRobotAndPower(ctx: CanvasRenderingContext2D, piece: any, cx: number, cy: number, sz: number) {
-  drawRobotPart(ctx, piece.type as RobotPartType, cx, cy, sz);
+  drawRobotPart(ctx, piece.type as PieceType, cx, cy, sz);
 
   // Draw Power Level indicator
   if (piece.power > 1) {
@@ -490,7 +510,7 @@ function drawRobotAndPower(ctx: CanvasRenderingContext2D, piece: any, cx: number
   }
 }
 
-function drawRobotPart(ctx: CanvasRenderingContext2D, type: RobotPartType, cx: number, cy: number, sz: number): void {
+function drawRobotPart(ctx: CanvasRenderingContext2D, type: PieceType, cx: number, cy: number, sz: number): void {
   const variant = getVariant(type);
   const body    = getBodyPart(type);
   const color   = VARIANT_COLORS[variant] || '#FFFFFF';
@@ -517,7 +537,6 @@ function drawRobotPart(ctx: CanvasRenderingContext2D, type: RobotPartType, cx: n
     case 'head':  drawRobotHeadShape(ctx, cx, cy - sz * 0.04, sz, color, light, variant);  break;
     case 'torso': drawRobotTorsoShape(ctx, cx, cy - sz * 0.02, sz, color, light, variant); break;
     case 'legs':  drawRobotLegsShape(ctx, cx, cy + sz * 0.02, sz, color, light, variant);  break;
-    case 'arm':   drawRobotArmShape(ctx, cx, cy - sz * 0.02, sz, color, light, variant);  break;
   }
 }
 
@@ -583,7 +602,7 @@ function drawBoard(ctx: CanvasRenderingContext2D, state: GameState, _dt: number)
       // Ghosting: Dim mismatched robot parts
       const isRobotPart = piece.type.includes('_');
       if (focusColors.size > 0 && isRobotPart) {
-        const variant = getVariant(piece.type as RobotPartType);
+        const variant = getVariant(piece.type as PieceType);
         const partColor = VARIANT_COLORS[variant];
         if (partColor && !focusColors.has(partColor)) {
           ctx.globalAlpha = 0.35;
@@ -756,7 +775,7 @@ function drawBoard(ctx: CanvasRenderingContext2D, state: GameState, _dt: number)
         }
         break;
       }
-      case 'purple': {
+      case 'magenta': {
         // Gravity Well — Swirling vortex in center + lines pulling from edges
         const pcx = BOARD_PAD + (BOARD_COLS / 2) * CELL_SIZE;
         const pcy = BOARD_PAD + (BOARD_ROWS / 2) * CELL_SIZE;

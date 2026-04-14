@@ -1,5 +1,6 @@
-import { Tray } from '../game/types';
+import { Tray, RobotColor } from '../game/types';
 import { COLOR_HEX, COLOR_NAMES, COLOR_ATTACK } from '../game/constants';
+import { predictRobotAttack } from '../game/attackPredictor';
 
 interface Props {
   tray: Tray;
@@ -16,7 +17,7 @@ export function RobotPanel({ tray, phase }: Props) {
   const parts    = SLOTS.map(s => tray[s.key]).filter(Boolean) as RobotColor[];
   const filled   = parts.length;
   const isReady  = filled === 3 || phase === 'assembling';
-  
+
   // Average power level for UI
   const avgPower = Math.ceil(SLOTS.reduce((acc, s) => acc + tray[s.powerKey], 0) / Math.max(1, filled));
 
@@ -29,131 +30,147 @@ export function RobotPanel({ tray, phase }: Props) {
     themeColor = COLOR_HEX[sorted[0][0] as RobotColor];
   }
 
+  const getPartName = (key: string) => {
+    if (key === 'headColor') return 'head';
+    if (key === 'torsoColor') return 'torso';
+    return 'legs';
+  };
+
   return (
     <div style={{
-      width:        '160px',
+      width:        '144px',
       background:   '#060d18',
       border:       `1px solid ${themeColor}55`,
       borderRadius: '12px',
-      padding:      '14px 12px',
+      padding:      '10px 8px',
       display:      'flex',
       flexDirection:'column',
-      gap:          '10px',
+      gap:          '8px',
+      alignItems:   'center',
     }}>
       {/* Header */}
-      <div style={{ textAlign: 'center', fontSize: '10px', fontWeight: 800, letterSpacing: '2px', color: themeColor }}>
-        WORKBENCH {avgPower > 3 && <span style={{ color: '#FFD600' }}>★LV{avgPower-2}</span>}
+      <div style={{ textAlign: 'center', fontSize: '9px', fontWeight: 800, letterSpacing: '2px', color: themeColor }}>
+        ASSEMBLY {avgPower > 3 && <span style={{ color: '#FFD600' }}>LV{avgPower-2}</span>}
       </div>
 
-      {/* Assembly status */}
+      {/* Status indicator */}
       <div style={{
-        textAlign:    'center',
-        fontSize:     '11px',
-        fontWeight:   700,
-        color:        filled > 0 ? themeColor : '#2a4060',
-        background:   isReady ? `${themeColor}33` : filled > 0 ? `${themeColor}18` : '#0a1220',
-        border:       `1px solid ${isReady ? themeColor : filled > 0 ? themeColor + '44' : '#1e3a5f'}`,
-        borderRadius: '6px',
-        padding:      '5px 0',
-        letterSpacing:'1px',
-        boxShadow:    isReady ? `0 0 10px ${themeColor}44` : 'none',
-        animation:    isReady ? 'pulse 1.5s infinite ease-in-out' : 'none',
-      }}>
-        {filled === 0 ? '— empty —' : filled < 3 ? 'In Progress' : 'READY!'}
-      </div>
+        width:       '6px',
+        height:      '6px',
+        borderRadius:'50%',
+        background:  isReady ? '#FFD600' : filled > 0 ? themeColor : '#2a4060',
+        boxShadow:   isReady ? `0 0 8px #FFD600` : filled > 0 ? `0 0 4px ${themeColor}` : 'none',
+        animation:   isReady ? 'pulse 1.5s infinite ease-in-out' : 'none',
+      }} />
 
-      {/* 3 slots */}
-      {SLOTS.map(({ key, powerKey, label }) => {
-        const color = tray[key];
-        const power = tray[powerKey];
-        const hex = color ? COLOR_HEX[color] : '#1e3a5f';
-        const done = !!color;
-        return (
-          <div key={key} style={{
-            display:      'flex',
-            alignItems:   'center',
-            gap:          '8px',
-            background:   done ? `${hex}18` : '#0a1220',
-            border:       `1px solid ${done ? hex + '66' : '#1e3a5f'}`,
-            borderRadius: '8px',
-            padding:      '8px 10px',
-          }}>
-            <div style={{
-              width:        '10px',
-              height:       '10px',
-              borderRadius: '50%',
-              background:   done ? hex : 'transparent',
-              border:       `2px solid ${done ? hex : '#2a4060'}`,
-              boxShadow:    done ? `0 0 6px ${hex}` : 'none',
-              flexShrink:   0,
-            }} />
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-              <span style={{ fontSize: '10px', fontWeight: 700, color: done ? hex : '#2a4060', letterSpacing: '1px' }}>
-                {label}
-              </span>
+      {/* Robot stack visualization - parts from top to bottom */}
+      <div style={{
+        display:       'flex',
+        flexDirection: 'column',
+        gap:           '-2px',
+        alignItems:    'center',
+        justifyContent:'center',
+      }}>
+        {SLOTS.map(({ key, powerKey }, idx) => {
+          const color = tray[key];
+          const power = tray[powerKey];
+          const hex = color ? COLOR_HEX[color] : '#1e3a5f';
+          const done = !!color;
+          const partName = getPartName(key);
+
+          return (
+            <div key={key} style={{
+              position:       'relative',
+              marginTop:      idx > 0 ? '-6px' : '0',
+              width:          '56px',
+              height:         '56px',
+              display:        'flex',
+              alignItems:     'center',
+              justifyContent: 'center',
+            }}>
+              <img
+                src={`/assets/${color || 'blue'}_${partName}.png`}
+                alt={partName}
+                style={{
+                  width:      '56px',
+                  height:     '56px',
+                  objectFit:  'contain',
+                  opacity:    done ? 1 : 0.15,
+                  filter:     done
+                    ? `drop-shadow(0 0 4px ${hex})`
+                    : `brightness(0.5) saturate(0) drop-shadow(0 1px 0 #2a4060) drop-shadow(0 -1px 0 #2a4060) drop-shadow(1px 0 0 #2a4060) drop-shadow(-1px 0 0 #2a4060)`,
+                  transition: 'opacity 0.3s, filter 0.3s',
+                  pointerEvents: 'none',
+                }}
+              />
               {done && power > 3 && (
-                <span style={{ fontSize: '8px', fontWeight: 800, color: '#FFD600' }}>POWER {power}</span>
+                <div style={{
+                  position:   'absolute',
+                  bottom:     '2px',
+                  right:      '2px',
+                  fontSize:   '7px',
+                  fontWeight: 800,
+                  color:      '#FFD600',
+                  background:'#1a1a1a',
+                  padding:    '1px 3px',
+                  borderRadius:'2px',
+                  border:     '1px solid #FFD600',
+                }}>
+                  P{power}
+                </div>
               )}
             </div>
-            {done && (
-              <span style={{ marginLeft: 'auto', fontSize: '9px', fontWeight: 800, color: hex }}>
-                {COLOR_NAMES[color].substring(0, 3).toUpperCase()}
-              </span>
-            )}
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
 
-      {/* Progress / attack hint */}
+      {/* Progress info */}
       <div style={{
         textAlign:    'center',
-        fontSize:     '9px',
-        color:        isReady ? themeColor : '#2a4060',
-        lineHeight:   1.4,
-        padding:      '6px 4px',
+        fontSize:     '8px',
+        color:        filled > 0 ? themeColor : '#2a4060',
+        padding:      '4px 4px',
         borderTop:    '1px solid #1e3a5f',
+        width:        '100%',
       }}>
-        {isReady 
-          ? (() => {
-              const majorityColor = parts.length > 0 ? parts.reduce((a, b) => 
-                parts.filter(v => v === a).length >= parts.filter(v => v === b).length ? a : b
-              ) : 'blue' as RobotColor; // Fallback during state reset animation
-              const avgPower = Math.ceil((tray.headPower + tray.torsoPower + tray.legsPower) / 3);
-              const bonus = parts.every(v => v === parts[0]) ? ' (ULTIMATE x2)' : '';
-              
-              let damageText = '';
-              const count = avgPower > 5 ? Math.max(3, avgPower - 3) : Math.max(1, avgPower - 2);
-              if (majorityColor === 'orange') damageText = `Clears ${count} most populated rows`;
-              else if (majorityColor === 'blue') damageText = `Clears ${count} most populated columns`;
-              else if (majorityColor === 'yellow') {
-                const rad = avgPower > 5 ? Math.max(5, avgPower - 1) : Math.floor((count + 1) / 2);
-                const size = rad * 2 + 1;
-                damageText = `Clears ${size}x${size} area`;
-              }
-              else if (majorityColor === 'green') damageText = `Clears the ${count} most common colors`;
-              else if (majorityColor === 'purple') damageText = `Clears ${15 + (count - 1) * 8} pieces inward`;
-
-              return (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <strong style={{ color: themeColor, fontSize: '10px' }}>
-                    READY: {COLOR_ATTACK[majorityColor]}
-                  </strong>
-                  <div style={{ 
-                    background: themeColor + '22', 
-                    color: '#fff', 
-                    padding: '4px', 
-                    borderRadius: '4px',
-                    border: `1px solid ${themeColor}44`,
-                    fontSize: '9px',
-                    fontWeight: 600
-                  }}>
-                    {damageText}{bonus}
-                  </div>
-                </div>
-              );
-            })()
-          : `${filled} / 3 parts collected`}
+        {filled === 0 && '0 / 3 parts'}
+        {filled === 1 && '1 / 3 parts'}
+        {filled === 2 && '2 / 3 parts'}
+        {filled === 3 && isReady && '✓ READY'}
       </div>
+
+      {/* Attack hint when ready */}
+      {isReady && (() => {
+        const majorityColor = parts.length > 0 ? parts.reduce((a, b) =>
+          parts.filter(v => v === a).length >= parts.filter(v => v === b).length ? a : b
+        ) : 'blue' as RobotColor;
+
+        // Calculate final power (average of 3 parts, with 2x bonus if ultimate)
+        const basePower = Math.ceil((tray.headPower + tray.torsoPower + tray.legsPower) / 3);
+        const isUltimate = parts.every(v => v === parts[0]);
+        const finalPower = isUltimate ? basePower * 2 : basePower;
+
+        const prediction = predictRobotAttack(majorityColor, finalPower);
+        const bonus = isUltimate ? '★ULTIMATE x2' : '';
+
+        return (
+          <div style={{
+            fontSize:     '7px',
+            fontWeight:   700,
+            color:        '#FFD600',
+            textAlign:    'center',
+            padding:      '3px',
+            background:   themeColor + '22',
+            borderRadius: '4px',
+            width:        '100%',
+            border:       `1px solid ${themeColor}44`,
+            lineHeight:   '1.2',
+          }}>
+            {prediction.description}
+            {bonus && <div>{bonus}</div>}
+          </div>
+        );
+      })() }
     </div>
   );
 }

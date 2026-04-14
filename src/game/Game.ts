@@ -1,4 +1,4 @@
-import { GameState, GameStats, Position, Tray, RobotColor, getColor, getBodyPart } from './types';
+import { GameState, GameStats, Position, Tray, RobotColor, LogEntry, getColor, getBodyPart } from './types';
 import {
   initBoard, swapPieces, isAdjacent,
   findMatches, removeMatched,
@@ -32,7 +32,7 @@ function freshStats(): GameStats {
     matches5plus:   0,
     bestCombo:      0,
     robotsLaunched: 0,
-    robotsByColor:  { blue: 0, yellow: 0, green: 0, purple: 0, orange: 0 },
+    robotsByColor:  { blue: 0, yellow: 0, green: 0, magenta: 0, orange: 0 },
     shuffles:       0,
   };
 }
@@ -46,11 +46,11 @@ export class Game {
   private _debug:     DebugTools;
 
   constructor() {
-    this._state = this._fresh();
+    this._state = this._fresh(loadLogs());
     this._debug = new DebugTools(this);
   }
 
-  private _fresh(): GameState {
+  private _fresh(initialLogs: LogEntry[] = []): GameState {
     const stats = freshStats();
     return {
       board:       initBoard(),
@@ -68,7 +68,7 @@ export class Game {
       combo:       0,
       message:     '',
       stats:       stats,
-      logs:        loadLogs(),
+      logs:        initialLogs,
     };
   }
 
@@ -214,7 +214,7 @@ export class Game {
   restart(): void {
     if (this._cpuTimer !== null) { clearTimeout(this._cpuTimer); this._cpuTimer = null; }
     this._busy  = false;
-    this._state = this._fresh();
+    this._state = this._fresh([]);
     this._emit();
     if (this._cpuMode) this._scheduleCpuMove();
   }
@@ -315,7 +315,7 @@ export class Game {
 
     if (tray.headColor && tray.torsoColor && tray.legsColor) {
       robotFired = true;
-      const counts: Record<RobotColor, number> = { blue: 0, yellow: 0, green: 0, purple: 0, orange: 0 };
+      const counts: Record<RobotColor, number> = { blue: 0, yellow: 0, green: 0, magenta: 0, orange: 0 };
       counts[tray.headColor]++;
       counts[tray.torsoColor]++;
       counts[tray.legsColor]++;

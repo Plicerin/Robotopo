@@ -266,11 +266,11 @@ export function computeRobotAttack(board: (Piece | null)[][], color: RobotColor,
       for (let r = 0; r < BOARD_ROWS; r++)
         for (let c = 0; c < BOARD_COLS; c++) {
           const p = board[r][c];
-          if (p && targets.includes(getColor(p.type))) keys.add(`${r},${c}`);
+          if (p && targets.includes(getColor(p.type) as any)) keys.add(`${r},${c}`);
         }
       break;
     }
-    case 'purple': {
+    case 'magenta': {
       // Gravity Well — clears pieces farthest from center (pulls inward)
       const cr = (BOARD_ROWS - 1) / 2, cc = (BOARD_COLS - 1) / 2;
       const pieces: { r: number; c: number; dist: number }[] = [];

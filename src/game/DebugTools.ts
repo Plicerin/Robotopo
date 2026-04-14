@@ -17,7 +17,7 @@ export class DebugTools {
 
     console.log("🛠️ Robotopo Debug Tools loaded.");
     console.log("   - window.debugRobot('blue', 6)  // Trigger ultimate blue");
-    console.log("   - window.fillColumn(0, 'purple') // Fill first col with purple parts");
+    console.log("   - window.fillColumn(0, 'magenta') // Fill first col with magenta parts");
   }
 
   private triggerManualRobot(color: string, power: number) {

@@ -1,5 +1,5 @@
 // ── Robot colors (5, matching the old regular-piece palette) ─────────────────
-export type RobotColor = 'blue' | 'yellow' | 'green' | 'purple' | 'orange';
+export type RobotColor = 'blue' | 'yellow' | 'green' | 'magenta' | 'orange';
 
 // ── Body parts (3 slots per robot) ───────────────────────────────────────────
 export type BodyPart = 'head' | 'torso' | 'legs';
@@ -14,6 +14,10 @@ export function getColor(type: PieceType): RobotColor {
 
 export function getBodyPart(type: PieceType): BodyPart {
   return type.split('-')[1] as BodyPart;
+}
+
+export function getVariant(type: PieceType): string {
+  return getColor(type);
 }
 
 // ── Build Tray — tracks progress toward the current robot assembly ────────────
