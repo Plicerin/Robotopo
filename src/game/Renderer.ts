@@ -559,6 +559,16 @@ function drawBoard(ctx: CanvasRenderingContext2D, state: GameState, _dt: number)
     }
   }
 
+  // Board outline
+  const boardX = BOARD_PAD;
+  const boardY = BOARD_PAD;
+  const boardW = BOARD_COLS * CELL_SIZE;
+  const boardH = BOARD_ROWS * CELL_SIZE;
+  roundRect(ctx, boardX, boardY, boardW, boardH, 8);
+  ctx.strokeStyle = '#FFFFFF';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
   // Selection highlight
   if (state.selected) {
     const { row, col } = state.selected;
