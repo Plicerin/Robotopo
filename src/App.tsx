@@ -138,6 +138,20 @@ export default function App() {
         <GameCanvas game={game} state={state} />
         <div style={{ position: 'absolute', right: `-${144 + GAP}px`, top: 2, display: 'flex', flexDirection: 'column', gap: '18px' }}>
           <RobotPanel tray={state.tray} phase={state.phase} />
+          <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+            <button
+              onClick={handleNewGame}
+              style={{ padding: '5px 16px', background: 'transparent', border: '1px solid #1e3a5f', borderRadius: '6px', color: '#4488cc', fontSize: '10px', cursor: 'pointer', letterSpacing: '1px', fontWeight: 600 }}
+            >
+              NEW GAME
+            </button>
+            <button
+              onClick={backToMenu}
+              style={{ padding: '5px 16px', background: 'transparent', border: '1px solid #1e3a5f', borderRadius: '6px', color: '#4488cc', fontSize: '10px', cursor: 'pointer', letterSpacing: '1px', fontWeight: 600 }}
+            >
+              MENU
+            </button>
+          </div>
         </div>
       </div>
 
@@ -150,20 +164,6 @@ export default function App() {
           {cpuMode
             ? 'CPU is playing — watch it align robot parts!'
             : 'Swap adjacent pieces to match 3+ · Match 3 of the same robot\'s parts in any line to activate it'}
-        </div>
-        <div style={{ display: 'flex', gap: '14px' }}>
-          <button
-            onClick={handleNewGame}
-            style={{ padding: '5px 16px', background: 'transparent', border: '1px solid #1e3a5f', borderRadius: '6px', color: '#4488cc', fontSize: '10px', cursor: 'pointer', letterSpacing: '1px', fontWeight: 600 }}
-          >
-            NEW GAME
-          </button>
-          <button
-            onClick={backToMenu}
-            style={{ padding: '5px 16px', background: 'transparent', border: '1px solid #1e3a5f', borderRadius: '6px', color: '#4488cc', fontSize: '10px', cursor: 'pointer', letterSpacing: '1px', fontWeight: 600 }}
-          >
-            MENU
-          </button>
         </div>
       </div>
     </div>
