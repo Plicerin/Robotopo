@@ -504,12 +504,26 @@ export class Game {
   private _checkLevelUp(): void {
     const { score, level } = this._state;
     const maxLevel = LEVEL_TARGETS.length - 1;
-    if (level >= maxLevel || score < LEVEL_TARGETS[level]) return;
+    
+    // Find what the level SHOULD be based on the score
+    let targetLevel = 1;
+    for (let i = 1; i < LEVEL_TARGETS.length; i++) {
+        if (score >= LEVEL_TARGETS[i]) {
+            targetLevel = i + 1;
+        } else {
+            break;
+        }
+    }
+    
+    // Clamp to max level defined in constants
+    targetLevel = Math.min(targetLevel, maxLevel);
 
-    const nextLevel  = level + 1;
+    if (targetLevel <= level) return;
+
+    const nextLevel  = targetLevel;
     const nextTarget = LEVEL_TARGETS[Math.min(nextLevel, maxLevel)];
     
-    this._busy = true; // Set busy before patching level change
+    this._busy = true;
     this._patch({ level: nextLevel, targetScore: nextTarget, message: `LEVEL ${nextLevel}!` });
 
     setTimeout(() => {
